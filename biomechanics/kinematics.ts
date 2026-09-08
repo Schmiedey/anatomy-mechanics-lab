@@ -1,9 +1,12 @@
 import { anthropometry, type ModelState } from '../anatomy/model';
 import { rotateZ, type Vec3 } from './vectors';
+
 export function kinematics(s: ModelState) {
   const q = (s.angle * Math.PI) / 180;
+  const pronation = (s.pronation * Math.PI) / 180;
   return {
     q,
+    pronation,
     elbow: [0, 0, 0] as Vec3,
     shoulder: [0, s.upperArm, 0] as Vec3,
     wrist: rotateZ([0, -s.forearm, 0], q),

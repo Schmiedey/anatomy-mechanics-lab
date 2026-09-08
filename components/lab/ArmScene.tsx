@@ -1,7 +1,7 @@
 'use client';
 import { useMemo, Suspense } from 'react';
 import { AtlasBone } from './AtlasBones';
-import { AtlasMuscle } from './AtlasMuscle';
+import { AtlasMuscle, muscleAssets } from './AtlasMuscle';
 import { Canvas, useThree, type ThreeEvent } from '@react-three/fiber';
 import {
   OrbitControls,
@@ -10,7 +10,7 @@ import {
   OrthographicCamera,
 } from '@react-three/drei';
 import * as THREE from 'three';
-import { anthropometry, type ModelState } from '@/anatomy/model';
+import { anthropometry, PRONATION_AXIS, type ModelState } from '@/anatomy/model';
 import type { Solution } from '@/biomechanics/inverseDynamics';
 import type { Vec3 } from '@/biomechanics/vectors';
 export interface Overlays {
@@ -19,6 +19,7 @@ export interface Overlays {
   arms: boolean;
   attachments: boolean;
   labels: boolean;
+  paths: boolean;
 }
 interface Props {
   state: ModelState;
@@ -102,13 +103,22 @@ function Anatomy({
             selected={selected}
             onSelect={onSelect}
           />
-          <AtlasBone
-            id="radius"
-            state={s}
-            selected={selected}
-            onSelect={onSelect}
-          />
         </Suspense>
+        <group
+          position={PRONATION_AXIS}
+          rotation={[0, (-s.pronation * Math.PI) / 180, 0]}
+        >
+          <group position={[-PRONATION_AXIS[0], -PRONATION_AXIS[1], -PRONATION_AXIS[2]]}>
+            <Suspense fallback={null}>
+              <AtlasBone
+                id="radius"
+                state={s}
+                selected={selected}
+                onSelect={onSelect}
+              />
+            </Suspense>
+          </group>
+        </group>
         {s.loadLb > 0 && (
           <group position={[0, -s.forearm * s.loadPosition, 0]}>
             <mesh rotation={[Math.PI / 2, 0, 0]}>
@@ -155,7 +165,7 @@ function Anatomy({
       {r.muscles.map((m) => {
         return (
           <group key={m.id}>
-            {view === 'anatomy' && (
+            {view === 'anatomy' && muscleAssets[m.id] && (
               <Suspense fallback={null}>
                 <AtlasMuscle
                   muscle={m}
@@ -163,6 +173,15 @@ function Anatomy({
                   onSelect={() => onSelect(m.id)}
                 />
               </Suspense>
+            )}
+            {o.paths && m.points.length > 1 && (
+              <Line
+                points={m.points}
+                color={m.color}
+                lineWidth={selected === m.id ? 2.4 : 1.4}
+                transparent
+                opacity={selected === m.id ? 0.95 : 0.55}
+              />
             )}
             {o.attachments &&
               [m.origin, m.insertion].map((p, j) => (
@@ -248,7 +267,7 @@ function Anatomy({
           <Html position={[0.075, 0.15, 0.04]} center>
             <button
               className="anatomy-label muscle-label"
-              onClick={() => onSelect('biceps')}
+              onClick={() => onSelect('bicepsLong')}
             >
               Biceps brachii<span>↙</span>
             </button>

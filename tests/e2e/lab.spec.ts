@@ -40,7 +40,7 @@ test('atlas assets, controls, experiments and comparisons work together', async 
   await page.getByRole('button', { name: 'Run an experiment' }).click();
   await page.getByRole('button', { name: /Disable the biceps/ }).click();
   await expect(
-    page.getByRole('spinbutton', { name: 'Biceps brachii', exact: true }),
+    page.getByRole('spinbutton', { name: 'Biceps long head', exact: true }),
   ).toHaveValue('0');
   await expect(
     page.locator('.muscle-card').first().locator('.muscle-force'),
@@ -118,6 +118,16 @@ test('atlas assets, controls, experiments and comparisons work together', async 
     fullPage: true,
   });
   await page.getByRole('button', { name: '90°', exact: true }).click();
+  await page.getByRole('button', { name: 'Validation', exact: true }).click();
+  await expect(page.getByRole('heading', { name: /Simulated curve/ })).toBeVisible();
+  await expect(page.locator('.validation table')).toContainText('RMSE');
+  await page.getByRole('button', { name: 'Simulation', exact: true }).click();
+  await page.getByRole('button', { name: 'Pro.', exact: true }).click();
+  await expect(page.getByRole('slider', { name: 'Forearm rotation' })).toHaveAttribute(
+    'aria-valuenow',
+    '180',
+  );
+  await page.getByRole('button', { name: 'Sup.', exact: true }).click();
   await page.getByRole('button', { name: 'Play motion', exact: true }).click();
   await expect(
     page.getByRole('slider', { name: 'Elbow angle', exact: true }),

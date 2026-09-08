@@ -1,18 +1,22 @@
 'use client';
-import { useMemo } from 'react';
 import { useLoader } from '@react-three/fiber';
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
 import {
   mergeVertices,
   mergeGeometries,
 } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { useMemo } from 'react';
 import * as THREE from 'three';
+import type { MuscleId } from '@/anatomy/types';
 import type { Solution } from '@/biomechanics/inverseDynamics';
-const assets = {
-  biceps: ['/models/biceps-short.stl', '/models/biceps-long.stl'],
+
+export const muscleAssets: Partial<Record<MuscleId, string[]>> = {
+  bicepsLong: ['/models/biceps-long.stl'],
+  bicepsShort: ['/models/biceps-short.stl'],
   brachialis: ['/models/brachialis.stl'],
   brachioradialis: ['/models/brachioradialis.stl'],
 };
+
 export function AtlasMuscle({
   muscle: m,
   selected,
@@ -22,7 +26,30 @@ export function AtlasMuscle({
   selected: boolean;
   onSelect: () => void;
 }) {
-  const sources = useLoader(STLLoader, assets[m.id]);
+  const files = muscleAssets[m.id];
+  if (!files) return null;
+  return (
+    <AtlasMuscleMesh
+      muscle={m}
+      files={files}
+      selected={selected}
+      onSelect={onSelect}
+    />
+  );
+}
+
+function AtlasMuscleMesh({
+  muscle: m,
+  files,
+  selected,
+  onSelect,
+}: {
+  muscle: Solution['muscles'][number];
+  files: string[];
+  selected: boolean;
+  onSelect: () => void;
+}) {
+  const sources = useLoader(STLLoader, files);
   const { geometry, referenceLength } = useMemo(() => {
     const g = mergeGeometries(sources.map((s) => s.clone()))!;
     g.deleteAttribute('normal');
@@ -91,13 +118,7 @@ export function AtlasMuscle({
       }}
     >
       <meshStandardMaterial
-        color={
-          m.id === 'biceps'
-            ? '#b44d42'
-            : m.id === 'brachialis'
-              ? '#995c42'
-              : '#a9554b'
-        }
+        color={m.color}
         roughness={0.53}
         emissive={selected ? '#9e3e29' : '#000'}
         emissiveIntensity={0.15}

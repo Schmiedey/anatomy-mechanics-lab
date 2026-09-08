@@ -29,3 +29,14 @@ export const rotateZ = (a: Vec3, q: number): Vec3 => [
   a[0] * Math.sin(q) + a[1] * Math.cos(q),
   a[2],
 ];
+export const rotateY = (a: Vec3, q: number): Vec3 => [
+  a[0] * Math.cos(q) + a[2] * Math.sin(q),
+  a[1],
+  -a[0] * Math.sin(q) + a[2] * Math.cos(q),
+];
+export function polylineLength(points: Vec3[]) {
+  let total = 0;
+  for (let i = 1; i < points.length; i++)
+    total += length(sub(points[i], points[i - 1]));
+  return total;
+}

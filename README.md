@@ -25,10 +25,10 @@ The browser tests use installed Google Chrome. The production output can be serv
 
 ## Architecture
 
-- `anatomy/model.ts`: muscle properties, anthropometric assumptions, editable state.
+- `anatomy/model.ts`: muscle properties, path primitives, anthropometric assumptions, editable state.
 - `anatomy/skeleton.ts`: atlas provenance, bones, segment membership, registration landmarks and elbow articulations.
-- `biomechanics/`: reusable SI vector math, kinematics, muscle paths, force capacity, external loads and constrained recruitment. No React or Three.js dependencies.
-- `components/lab/`: controls, plots, comparisons, raw inspector and interactive atlas meshes.
+- `biomechanics/`: reusable SI vector math, 2-DOF kinematics, wrapping, via points, force capacity, external loads, signed recruitment and literature-curve comparison. No React or Three.js dependencies.
+- `components/lab/`: controls, plots, comparisons, validation, raw inspector and interactive atlas meshes.
 - `public/models/`: locally bundled BodyParts3D anatomical assets, license and attribution.
 
 ## Equations and conventions
@@ -37,9 +37,9 @@ All engine lengths are metres, forces newtons and torques N·m. Angles enter the
 
 The wrist is `Rz(q) [0, -forearmLength, 0]`. The load acts at `forearmLength × loadPosition`. External torque is the negative Z component of `r × F`. Optional arm self-weight adds forearm and hand gravitational torques. A zero dumbbell load therefore gives zero _external load torque_, while arm self-weight may still require muscle force.
 
-For each straight muscle path, `L = |origin - insertion|`, `u = (origin - insertion) / L`, and the signed moment arm is `(insertion × u).z = -dL/dq`. Positive moment arms produce flexion.
+For each muscle path, length is the polyline through origin, active via points, wrapping contacts and insertion. Signed moment arms are `-dL/dθ` from that length: flexion about +Z, pronation about the forearm axis. Positive flexion moment arms produce flexion; biceps also has a supination moment arm because it inserts on the radius. A wrapping cylinder or sphere is used only when the chord would intersect the obstacle.
 
-Recruitment minimizes `Σ (Fi / capacity_i)²`, subject to `Σ ri Fi = requiredTorque` and `0 ≤ Fi ≤ capacity_i`. With ideal muscle generators, capacity equals scaled Fmax. The scalar dual solution is `Fi = clamp(λ ri capacity_i², 0, capacity_i)`. Monotone bisection finds λ. Muscles with zero capacity or negative leverage contribute no flexor force. Infeasible demands saturate useful actuators, retain the force bounds and report the unmet torque explicitly.
+Recruitment minimizes `Σ (Fi / capacity_i)²`, subject to `Σ ri Fi = requiredTorque` and `0 ≤ Fi ≤ capacity_i`. Moment arms `ri` may be negative (extensors). The scalar dual solution is `Fi = clamp(λ ri capacity_i², 0, capacity_i)`. Monotone bisection finds λ over the full real line. Optional co-contraction raises antagonist force, then re-solves agonists so net torque is preserved when feasible. Infeasible demands saturate useful actuators, retain the force bounds and report the unmet torque explicitly.
 
 The optional simplified Hill-type capacity uses:
 
@@ -55,9 +55,11 @@ Mechanical advantage is muscle moment arm divided by the perpendicular load mome
 
 ## Anatomy and limitations
 
-The humerus, radius, ulna, biceps (both heads), brachialis and brachioradialis are actual BodyParts3D atlas surface meshes. The right-sided FMA identifiers are recorded in `public/models/ATTRIBUTION.md`. The humeral trochlea/capitulum, ulnar trochlear notch and radial head are part of the source surfaces. Use **Inspect elbow joint** for the skeletal close-up, and orbit to view the articulation from other directions.
+The humerus, radius, ulna, biceps long head, biceps short head, brachialis and brachioradialis are actual BodyParts3D atlas surface meshes. Triceps and anconeus are path actuators without atlas meshes. The right-sided FMA identifiers are recorded in `public/models/ATTRIBUTION.md`. The humeral trochlea/capitulum, ulnar trochlear notch and radial head are part of the source surfaces. Use **Inspect elbow joint** for the skeletal close-up, and orbit to view the articulation from other directions.
 
-Atlas bone-frame registration uses estimated landmarks, not a clinically fitted joint axis. Segment length changes stretch bone geometry longitudinally. Muscle surfaces are aligned and stretched along the calculation path; their mesh vertices do not define moment arms. Attachments and physiology are illustrative reference assumptions. The simplified hinge does not solve bone contact, cartilage deformation, ligaments or radioulnar rotation. No visual hand is included; its optional lumped mass is included in arm self-weight.
+Atlas bone-frame registration uses estimated landmarks, not a clinically fitted joint axis. Segment length changes stretch bone geometry longitudinally. Muscle surfaces are aligned and stretched along the origin–insertion chord; their mesh vertices do not define moment arms. Mechanical paths (via points and wrapping) are the source of moment arms. Attachments and physiology are illustrative reference assumptions. The model flexes the ulna and spins the radius; it does not solve bone contact, cartilage deformation or ligaments. No visual hand is included; its optional lumped mass is included in arm self-weight.
+
+The **Validation** tab compares simulated moment arms with characteristic curves reconstructed from Murray, Delp and Buchanan (J Biomech 1995 and 2002). Those references are literature-derived peaks, peak angles and ROM variation, not a point-by-point specimen fit. RMSE on that tab is a geometry check, not a claim of clinical validity.
 
 The model is an extensible educational engineering simulator, not a validated clinical or subject-specific musculoskeletal model. The atlas detail must not be confused with greater accuracy in the mechanical assumptions.
 

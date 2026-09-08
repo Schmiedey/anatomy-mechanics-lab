@@ -18,7 +18,7 @@ export function Chart({
 }) {
   const width = 340,
     height = 150,
-    left = 36,
+    left = 40,
     right = 12,
     top = 14,
     bottom = 27;
@@ -32,11 +32,17 @@ export function Chart({
               ? m.force
               : m.length * 100,
         );
-  const max = Math.max(1, ...samples.flatMap(values)) * 1.12,
-    plotW = width - left - right,
+  const all = samples.flatMap(values);
+  const minV = Math.min(0, ...all);
+  const maxV = Math.max(0.01, ...all);
+  const pad = Math.max(0.08, (maxV - minV) * 0.12);
+  const y0 = minV - (minV < 0 ? pad : 0);
+  const y1 = maxV + pad;
+  const plotW = width - left - right,
     plotH = height - top - bottom;
-  const x = (q: number) => left + (q / 140) * plotW,
-    y = (v: number) => top + plotH - (v / max) * plotH;
+  const x = (q: number) => Number((left + (q / 140) * plotW).toFixed(2)),
+    y = (v: number) =>
+      Number((top + plotH - ((v - y0) / (y1 - y0)) * plotH).toFixed(2));
   const titles: Record<typeof kind, string> = {
       torque: 'External torque',
       arm: 'Muscle moment arm',
@@ -51,6 +57,7 @@ export function Chart({
       length: 'estimated',
     };
   const current = { ...result, angle };
+  const ticks = minV < -1e-6 ? [y0, 0, y1] : [0, 0.5 * y1, y1];
   const scrub = (e: React.PointerEvent<SVGSVGElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
     onAngle(
@@ -85,18 +92,18 @@ export function Chart({
           if (e.buttons === 1) scrub(e);
         }}
       >
-        {[0, 0.5, 1].map((f) => (
-          <g key={f}>
+        {ticks.map((v) => (
+          <g key={v}>
             <line
               x1={left}
               x2={width - right}
-              y1={y(max * f)}
-              y2={y(max * f)}
+              y1={y(v)}
+              y2={y(v)}
               stroke="#e4d8c4"
               strokeDasharray="2 5"
             />
-            <text x={left - 8} y={y(max * f) + 4} textAnchor="end">
-              {(max * f).toFixed(max < 10 ? 1 : 0)}
+            <text x={left - 8} y={y(v) + 4} textAnchor="end">
+              {v.toFixed(Math.abs(v) < 10 ? 1 : 0)}
             </text>
           </g>
         ))}
@@ -116,7 +123,8 @@ export function Chart({
               .join(' ')}
             fill="none"
             stroke={kind === 'torque' ? '#b23a28' : muscles[i].color}
-            strokeWidth={1.75}
+            strokeWidth={kind === 'torque' ? 1.75 : 1.25}
+            opacity={kind === 'torque' ? 1 : 0.9}
           />
         ))}
         <line
@@ -133,10 +141,10 @@ export function Chart({
               key={i}
               cx={x(angle)}
               cy={y(v)}
-              r={3.2}
+              r={2.8}
               fill={kind === 'torque' ? '#b23a28' : muscles[i].color}
               stroke="#f7f1e4"
-              strokeWidth={1.5}
+              strokeWidth={1.2}
             />
           ))}
       </svg>

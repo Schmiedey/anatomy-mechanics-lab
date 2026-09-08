@@ -17,9 +17,8 @@ import {
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
-import { DEFAULT_STATE, muscles, type ModelState } from '@/anatomy/model';
+import { DEFAULT_STATE, muscles, flexors, extensors, type ModelState } from '@/anatomy/model';
 import { solve, sweep } from '@/biomechanics/inverseDynamics';
-import { Chart } from './Chart';
 import type { Overlays } from './ArmScene';
 import { Mark, ProvenanceLegend, type ProvenanceKind } from './Provenance';
 import { skeleton } from '@/anatomy/skeleton';
@@ -29,6 +28,14 @@ const ArmScene = dynamic(() => import('./ArmScene'), {
     <div className="scene-loading">Preparing anatomical model…</div>
   ),
 });
+const Chart = dynamic(
+  () => import('./Chart').then((m) => ({ default: m.Chart })),
+  { ssr: false },
+);
+const ValidationPanel = dynamic(
+  () => import('./Validation').then((m) => ({ default: m.ValidationPanel })),
+  { ssr: false },
+);
 const fmt = (v: number, d = 1) => v.toFixed(d);
 function Range({
   label,
@@ -114,13 +121,14 @@ export default function Lab() {
   const [state, setState] = useState<ModelState>(
     structuredClone(DEFAULT_STATE),
   );
-  const [selected, setSelected] = useState('biceps');
+  const [selected, setSelected] = useState('bicepsLong');
   const [overlays, setOverlays] = useState<Overlays>({
     muscles: false,
     external: true,
     arms: false,
     attachments: false,
     labels: true,
+    paths: true,
   });
   const [view, setView] = useState<'anatomy' | 'skeleton'>('anatomy');
   const [resetKey, setResetKey] = useState(0);
@@ -130,7 +138,9 @@ export default function Lab() {
   const [modal, setModal] = useState<'model' | 'debug' | 'experiments' | null>(
     null,
   );
-  const [tab, setTab] = useState<'simulation' | 'comparison'>('simulation');
+  const [tab, setTab] = useState<
+    'simulation' | 'comparison' | 'validation'
+  >('simulation');
   const [snapshots, setSnapshots] = useState<{
     A: ModelState | null;
     B: ModelState | null;
@@ -146,6 +156,8 @@ export default function Lab() {
     selfWeight,
     hill,
     velocity,
+    pronation,
+    coContraction,
   } = state;
   const samples = useMemo(
     () =>
@@ -160,6 +172,8 @@ export default function Lab() {
         selfWeight,
         hill,
         velocity,
+        pronation,
+        coContraction,
       }),
     [
       forearm,
@@ -171,6 +185,8 @@ export default function Lab() {
       selfWeight,
       hill,
       velocity,
+      pronation,
+      coContraction,
     ],
   );
   const change = <K extends keyof ModelState>(key: K, v: ModelState[K]) =>
@@ -218,7 +234,7 @@ export default function Lab() {
     setState(structuredClone(DEFAULT_STATE));
     setPlaying(false);
     setAdvanced(false);
-    setSelected('biceps');
+    setSelected('bicepsLong');
     setFocusJoint(false);
     setView('anatomy');
     setOverlays({
@@ -227,6 +243,7 @@ export default function Lab() {
       arms: false,
       attachments: false,
       labels: true,
+      paths: true,
     });
     setResetKey((k) => k + 1);
   };
@@ -236,7 +253,14 @@ export default function Lab() {
         ? { ...s, forearm: 0.36 }
         : id === 1
           ? { ...s, bicepsInsertion: 0.065 }
-          : { ...s, strengths: { ...s.strengths, biceps: 0 } },
+          : id === 2
+            ? {
+                ...s,
+                strengths: { ...s.strengths, bicepsLong: 0, bicepsShort: 0 },
+              }
+            : id === 3
+              ? { ...s, pronation: 180 }
+              : { ...s, coContraction: 0.35 },
     );
     setModal(null);
   };
@@ -248,7 +272,7 @@ export default function Lab() {
           <strong>Mechanics Lab</strong>
         </Link>
         <div className="header-right">
-          <span className="version">Preview 0.1</span>
+          <span className="version">Preview 0.2</span>
           <button className="quiet" onClick={() => setModal('model')}>
             Model notes
           </button>
@@ -258,7 +282,7 @@ export default function Lab() {
         <div>
           <h1>
             Elbow Flexion <span>Mechanics Lab</span>
-            <span className="model-badge">1 DOF hinge</span>
+            <span className="model-badge">2 DOF · wrap paths</span>
           </h1>
         </div>
         <button
@@ -283,6 +307,12 @@ export default function Lab() {
             Compare configurations{' '}
             {snapshots.A && <span className="tiny-dot" />}
           </button>
+          <button
+            className={tab === 'validation' ? 'active' : ''}
+            onClick={() => setTab('validation')}
+          >
+            Validation
+          </button>
         </div>
         <div className="local-status">
           {state.hill ? 'Hill-type capacity' : 'Static equilibrium'}
@@ -303,6 +333,8 @@ export default function Lab() {
             }
           }}
         />
+      ) : tab === 'validation' ? (
+        <ValidationPanel />
       ) : (
         <div className="workspace">
           <aside className="controls">
@@ -352,6 +384,46 @@ export default function Lab() {
                   </button>
                 ))}{' '}
               </div>
+              <div className="angle-readout forearm-readout">
+                <span>
+                  {fmt(state.pronation, 0)}
+                  <sup>°</sup>
+                </span>
+                <span>Forearm rotation</span>
+              </div>
+              <BaseField.Root>
+                <BaseField.Label className="sr-only">
+                  Forearm rotation
+                </BaseField.Label>
+                <Slider
+                  aria-label="Forearm rotation"
+                  min={0}
+                  max={180}
+                  value={[state.pronation]}
+                  onValueChange={(v) =>
+                    change('pronation', Array.isArray(v) ? v[0] : v)
+                  }
+                />
+              </BaseField.Root>
+              <div className="range-ends">
+                <span>0° Supinated</span>
+                <span>180° Pronated</span>
+              </div>
+              <div className="preset-angles">
+                {[
+                  [0, 'Sup.'],
+                  [90, 'Ntrl'],
+                  [180, 'Pro.'],
+                ].map(([a, label]) => (
+                  <button
+                    className={Math.round(state.pronation) === a ? 'chosen' : ''}
+                    key={a}
+                    onClick={() => change('pronation', a as number)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
             </section>
             <section className="control-section">
               <div className="section-label">Load</div>
@@ -396,26 +468,33 @@ export default function Lab() {
             </section>
             <section className="control-section">
               <div className="section-label">Strength</div>
-              {muscles.map((m) => (
-                <div
-                  className="muscle-range"
-                  key={m.id}
-                  style={{ '--muscle': m.color } as React.CSSProperties}
-                >
-                  <Range
-                    label={m.name}
-                    value={state.strengths[m.id] * 100}
-                    min={0}
-                    max={200}
-                    step={5}
-                    unit="%"
-                    onChange={(v) =>
-                      change('strengths', {
-                        ...state.strengths,
-                        [m.id]: v / 100,
-                      })
-                    }
-                  />
+              {(['flexor', 'extensor'] as const).map((group) => (
+                <div key={group}>
+                  <div className="muscle-group-label">
+                    {group === 'flexor' ? 'Flexors' : 'Extensors'}
+                  </div>
+                  {(group === 'flexor' ? flexors : extensors).map((m) => (
+                    <div
+                      className="muscle-range"
+                      key={m.id}
+                      style={{ '--muscle': m.color } as React.CSSProperties}
+                    >
+                      <Range
+                        label={m.name}
+                        value={state.strengths[m.id] * 100}
+                        min={0}
+                        max={200}
+                        step={5}
+                        unit="%"
+                        onChange={(v) =>
+                          change('strengths', {
+                            ...state.strengths,
+                            [m.id]: v / 100,
+                          })
+                        }
+                      />
+                    </div>
+                  ))}
                 </div>
               ))}
               <button
@@ -461,9 +540,24 @@ export default function Lab() {
                       onChange={(v) => change('velocity', v)}
                     />
                   )}
+                  {state.hill && (
+                    <p className="small-note">
+                      Velocity adjusts capacity only. No inertial torque or
+                      tendon compliance.
+                    </p>
+                  )}
+                  <Range
+                    label="Co-contraction"
+                    value={state.coContraction * 100}
+                    min={0}
+                    max={80}
+                    step={5}
+                    unit="%"
+                    onChange={(v) => change('coContraction', v / 100)}
+                  />
                   <p className="small-note">
-                    Velocity adjusts capacity only. No inertial torque or tendon
-                    compliance.
+                    Adds antagonist force, then re-solves agonists so net
+                    flexion torque is preserved.
                   </p>
                 </div>
               )}
@@ -486,7 +580,14 @@ export default function Lab() {
                   Skeleton
                 </button>
               </div>
-              <span className="view-caption">Right arm · supinated</span>
+              <span className="view-caption">
+                Right arm ·{' '}
+                {state.pronation < 45
+                  ? 'supinated'
+                  : state.pronation > 135
+                    ? 'pronated'
+                    : 'neutral'}
+              </span>
             </div>
             <div className="scene">
               <ArmScene
@@ -541,7 +642,7 @@ export default function Lab() {
               </button>
             </div>
             <div className="view-overlays">
-              {(['muscles', 'external', 'arms', 'attachments'] as const).map(
+              {(['muscles', 'external', 'arms', 'attachments', 'paths'] as const).map(
                 (key, i) => (
                   <button
                     key={key}
@@ -557,6 +658,7 @@ export default function Lab() {
                         'External forces',
                         'Moment arms',
                         'Attachments',
+                        'Muscle paths',
                       ][i]
                     }
                   </button>
@@ -619,6 +721,18 @@ export default function Lab() {
                 </span>
                 <b>{fmt(result.external.selfTorque)} N·m</b>
               </div>
+              <div className="summary-row">
+                <span>
+                  Flexor torque <Mark kind="estimated" compact />
+                </span>
+                <b>{fmt(result.flexorTorque)} N·m</b>
+              </div>
+              <div className="summary-row">
+                <span>
+                  Extensor torque <Mark kind="estimated" compact />
+                </span>
+                <b>{fmt(result.extensorTorque)} N·m</b>
+              </div>
               <div
                 className={`equilibrium ${!result.recruitment.feasible ? 'warning' : ''}`}
               >
@@ -635,46 +749,39 @@ export default function Lab() {
             <div className="muscle-metrics-title">
               Recruitment <span>min Σ aᵢ²</span>
             </div>
-            {result.muscles.map((m) => (
-              <button
-                className={`muscle-card ${selected === m.id ? 'selected' : ''}`}
-                key={m.id}
-                onClick={() => setSelected(m.id)}
-                style={{ '--muscle': m.color } as React.CSSProperties}
-              >
-                <div className="muscle-card-heading">
-                  <span>
-                    <i />
-                    {m.name}
-                  </span>
+            {(['flexor', 'extensor'] as const).map((group) => (
+              <div key={group}>
+                <div className="muscle-group-label panel-group">
+                  {group === 'flexor' ? 'Flexors' : 'Extensors'}
                 </div>
-                <div className="muscle-force">
-                  {fmt(m.force, 0)} <span>N</span>
-                  <Mark kind="estimated" compact />
-                  <small>
-                    {fmt(m.activation * 100, 0)}% of assumed capacity
-                  </small>
-                </div>
-                <div className="capacity-track">
-                  <span style={{ width: `${m.activation * 100}%` }} />
-                </div>
-                <div className="muscle-dimensions">
-                  <span>
-                    Length <Mark kind="estimated" compact />
-                    <b>
-                      {fmt(m.length * 100)}
-                      <small> cm</small>
-                    </b>
-                  </span>
-                  <span>
-                    Moment arm <Mark kind="estimated" compact />
-                    <b>
-                      {fmt(m.momentArm * 100, 2)}
-                      <small> cm</small>
-                    </b>
-                  </span>
-                </div>
-              </button>
+                {result.muscles
+                  .filter((m) => m.group === group)
+                  .map((m) => (
+                    <button
+                      className={`muscle-card compact ${selected === m.id ? 'selected' : ''}`}
+                      key={m.id}
+                      onClick={() => setSelected(m.id)}
+                      style={{ '--muscle': m.color } as React.CSSProperties}
+                    >
+                      <div className="muscle-card-heading">
+                        <span>
+                          <i />
+                          {m.shortName}
+                        </span>
+                      </div>
+                      <div className="muscle-force">
+                        {fmt(m.force, 0)} <span>N</span>
+                        <Mark kind="estimated" compact />
+                        <small>
+                          {fmt(m.activation * 100, 0)}% · {fmt(m.torque, 1)} N·m
+                        </small>
+                      </div>
+                      <div className="capacity-track">
+                        <span style={{ width: `${m.activation * 100}%` }} />
+                      </div>
+                    </button>
+                  ))}
+              </div>
             ))}
             <div className="selection-details">
               <div className="eyebrow">Selected</div>
@@ -690,6 +797,26 @@ export default function Lab() {
               </strong>
               {selectedMuscle ? (
                 <>
+                  <div className="summary-row">
+                    <span>
+                      Flexion moment arm <Mark kind="estimated" compact />
+                    </span>
+                    <b>{fmt(selectedMuscle.momentArm * 100, 2)} cm</b>
+                  </div>
+                  <div className="summary-row">
+                    <span>
+                      Supination moment arm <Mark kind="estimated" compact />
+                    </span>
+                    <b>
+                      {fmt(-selectedMuscle.pronationMomentArm * 100, 2)} cm
+                    </b>
+                  </div>
+                  <div className="summary-row">
+                    <span>
+                      Path length <Mark kind="estimated" compact />
+                    </span>
+                    <b>{fmt(selectedMuscle.length * 100)} cm</b>
+                  </div>
                   <div className="summary-row">
                     <span>
                       Mechanical advantage <Mark kind="estimated" compact />
@@ -745,7 +872,7 @@ export default function Lab() {
             {muscles.map((m) => (
               <span key={m.id}>
                 <i style={{ background: m.color }} />
-                {m.id === 'biceps' ? 'Biceps' : m.name}
+                {m.shortName}
               </span>
             ))}
           </div>
@@ -810,6 +937,8 @@ export default function Lab() {
                 'Lengthen the forearm',
                 'Move the biceps insertion',
                 'Disable the biceps',
+                'Pronate the forearm',
+                'Add co-contraction',
               ].map((title, i) => (
                 <button
                   className="experiment-option"
@@ -824,7 +953,9 @@ export default function Lab() {
                         [
                           'Set forearm length to 36 cm. Explore the increase in external torque.',
                           'Set insertion distance to 6.5 cm. Compare leverage and recruitment.',
-                          'Set biceps strength to 0%. Observe force redistribution or a torque deficit.',
+                          'Set both biceps heads to 0%. Observe force redistribution or a torque deficit.',
+                          'Set forearm rotation to full pronation. Watch biceps path, length and moment arms change.',
+                          'Set co-contraction to 35%. Extensors fire; flexors increase to keep net torque.',
                         ][i]
                       }
                     </p>
@@ -845,6 +976,11 @@ export default function Lab() {
                 {JSON.stringify(
                   {
                     angleRad: result.kinematics.q,
+                    pronationRad: result.kinematics.pronation,
+                    pathPoints: result.muscles.map((m) => ({
+                      id: m.id,
+                      points: m.points,
+                    })),
                     forearmCOM: result.kinematics.forearmCOM,
                     loadPosition: result.kinematics.load,
                     gravity: result.external.gravity,
@@ -959,8 +1095,8 @@ function Comparison({
             <div>
               <h3>Configuration {slot}</h3>
               <p>
-                {snapshots[slot]
-                  ? `${fmt(snapshots[slot]!.angle, 0)}° flexion · ${snapshots[slot]!.loadLb} lb · ${fmt(snapshots[slot]!.forearm * 100)} cm forearm`
+                  {snapshots[slot]
+                  ? `${fmt(snapshots[slot]!.angle, 0)}° flexion · ${fmt(snapshots[slot]!.pronation, 0)}° forearm · ${snapshots[slot]!.loadLb} lb · ${fmt(snapshots[slot]!.forearm * 100)} cm forearm`
                   : 'No configuration saved yet'}
               </p>
             </div>
@@ -1011,17 +1147,15 @@ function Comparison({
 function ModelNotes() {
   return (
     <>
-      <span className="eyebrow">MODEL NOTES · VERSION 0.1</span>
+      <span className="eyebrow">MODEL NOTES · VERSION 0.2</span>
       <h2>A transparent mechanical model.</h2>
       <p>
-        This educational model represents a fixed humerus and a supinated
-        forearm rotating around a single elbow hinge. The humerus, radius, ulna
-        and flexor muscle surfaces come from the BodyParts3D anatomical atlas.
-        Bone registration and muscle deformation are approximate. The load is
-        applied at the configurable distal lever position; a hand is not modeled
-        visually. The detailed articular surfaces do not imply a contact or
-        cartilage simulation. Force arrow lengths use square-root scaling for
-        readability; numeric force values remain in newtons.
+        This educational model represents a fixed humerus, an ulna that flexes
+        about a hinge, and a radius that both flexes and pronates around the
+        forearm axis. The humerus, radius, ulna and flexor muscle surfaces come
+        from the BodyParts3D anatomical atlas. Extensor paths are mechanical
+        polylines only; there is no triceps atlas mesh yet. Bone registration
+        and muscle deformation are approximate.
       </p>
       <h3>How to read the numbers</h3>
       <p>
@@ -1101,11 +1235,14 @@ function ModelNotes() {
       </p>
       <h3>Muscle paths & recruitment</h3>
       <p>
-        Each muscle uses a straight origin-to-insertion path. Moment arms are
-        signed geometric cross products and equal −dL/dθ. The solver minimizes
-        Σ(Fᵢ / capacityᵢ)² subject to torque equilibrium and force bounds. When
-        capacity is insufficient, all useful flexors saturate and the remaining
-        torque is reported.
+        Each muscle is a polyline: origin, optional via points (some
+        conditional on joint angle), wrapping on cylinders or spheres, then
+        insertion. Attachments live on the humerus, ulna or radius. Moment arms
+        are −dL/dθ from path length, including wrap geometry. The solver
+        minimizes Σ(Fᵢ / capacityᵢ)² subject to signed torque equilibrium and
+        force bounds. Extensors have negative flexion moment arms. Optional
+        co-contraction forces antagonists, then re-solves agonists so net
+        torque is preserved when feasible.
       </p>
       <h3>Simplified Hill-type physiology</h3>
       <p>
@@ -1141,11 +1278,16 @@ function ModelNotes() {
       </table>
       <p>
         These reference values and attachment points are illustrative
-        engineering assumptions. Paths have no wrapping or contact constraints;
-        there are no extensors, passive forces, ligament forces or joint
-        reaction estimates. Mechanical advantage is muscle moment arm divided by
-        the load’s perpendicular moment arm and is undefined at zero load moment
-        arm.
+        engineering assumptions, partly inspired by Holzbaur-type upper-extremity
+        models. Biceps long and short heads originate on proximal humerus
+        stand-ins for the supraglenoid tubercle and coracoid; the scapula is not
+        in this scene. Validation compares simulated moment arms with
+        characteristic curves reconstructed from Murray, Delp and Buchanan
+        (1995, 2002). That comparison does not make the model a validated
+        clinical simulator. Paths have no ligament or contact forces; joint
+        reaction estimates are absent. Mechanical advantage is muscle moment
+        arm divided by the load’s perpendicular moment arm and is undefined at
+        zero load moment arm.
       </p>
       <a
         className="source-link"

@@ -796,9 +796,25 @@ abbr.mark {
   background: transparent;
   position: relative;
 }
-.muscle-card.selected {
-  background: #f3ead8;
-  box-shadow: inset 3px 0 0 var(--muscle);
+.muscle-card.compact {
+  padding: 8px 18px 9px;
+}
+.muscle-card.compact .muscle-force {
+  font-size: 20px;
+  margin-top: 2px;
+}
+.muscle-group-label {
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+  padding: 10px 18px 2px;
+}
+.muscle-group-label.panel-group {
+  border-top: 1px solid var(--rule);
+}
+.forearm-readout {
+  margin-top: 14px;
 }
 .muscle-card:hover {
   background: #f3ead8;
@@ -931,7 +947,10 @@ abbr.mark {
 }
 .legend {
   display: flex;
-  gap: 16px;
+  gap: 10px 16px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  max-width: 52%;
 }
 .legend > span {
   font-size: 12px;
@@ -1227,6 +1246,95 @@ abbr.mark {
 }
 .viewport:fullscreen {
   height: 100vh;
+}
+.validation {
+  margin: 0 20px;
+  padding: 28px 32px 36px;
+  background: var(--paper-raised);
+  border: 1px solid var(--rule);
+  border-top: 0;
+}
+.validation-intro h2,
+.validation-intro + .validation-toolbar {
+  margin-bottom: 8px;
+}
+.validation-intro p,
+.validation-toolbar .small-note {
+  max-width: 62ch;
+  color: var(--ink-soft);
+  font-size: 14px;
+}
+.validation-toolbar {
+  display: flex;
+  gap: 24px;
+  align-items: end;
+  margin: 18px 0 12px;
+}
+.validation-toolbar label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--ink-mute);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.validation-toolbar select {
+  font: inherit;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  padding: 8px 10px;
+  min-width: 240px;
+}
+.validation-plot {
+  width: 100%;
+  max-width: 720px;
+  display: block;
+}
+.validation-plot text {
+  font-size: 11px;
+  fill: #8a7e6e;
+  font-family: var(--font-num), ui-monospace, monospace;
+}
+.validation-legend {
+  display: flex;
+  gap: 18px;
+  font-size: 12px;
+  color: var(--ink-soft);
+  margin: 8px 0 18px;
+}
+.validation-legend i {
+  display: inline-block;
+  width: 18px;
+  height: 2px;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+.validation-legend .sim {
+  background: #b23a28;
+}
+.validation-legend .ref {
+  background: #8a7e6e;
+  height: 0;
+  border-top: 2px dashed #8a7e6e;
+}
+.validation table {
+  width: min(520px, 100%);
+  border-collapse: collapse;
+}
+.validation th,
+.validation td {
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--rule);
+  text-align: left;
+  font-size: 13px;
+}
+.validation td:last-child {
+  font-family: var(--font-num), ui-monospace, monospace;
+  text-align: right;
 }
 .viewport:fullscreen .scene {
   height: calc(100vh - 148px);

@@ -76,6 +76,6 @@ export const skeleton = {
       },
     ],
     kinematics:
-      'Single flexion–extension hinge; radioulnar rotation held fixed. No contact solver.',
+      'Humeroulnar flexion–extension (0–140°) plus radius spin about the forearm axis (0° supinated to 180° pronated). Ulna does not pronate. No contact solver.',
   },
 };
